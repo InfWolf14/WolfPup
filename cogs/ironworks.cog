@@ -18,10 +18,11 @@ class IronWorks(commands.Cog):
 
         if len(wish) == 0:
             empty_wish_embed = discord.Embed(title="Cid needs you to format your request properly!",
-                                             description="Please include what your request is with your command. i.e. "
-                                                         ";wish Titanbronze Star Globe")
-            empty_wish_embed.set_thumbnail(
-                url="https://cdn.discordapp.com/attachments/532380077896237061/786762838789849139/Cid_ARR.jpg")
+                description="Please include what your request is with your command. i.e. "
+                    ";wish Titanbronze Star Globe")
+                    
+            # empty_wish_embed.set_thumbnail(url="https://cdn.discordapp.com/attachments/532380077896237061/786762838789849139/Cid_ARR.jpg")
+            
             await ctx.channel.send(embed=empty_wish_embed)
             return
 
