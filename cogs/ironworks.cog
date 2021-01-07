@@ -4,6 +4,10 @@ from datetime import datetime
 import discord
 from discord.ext import commands
 
+IRONWORK_CHANNEL = 786758347818008626
+IRONWORK_BOT_ID = 795749771289690152
+IRONWORK_WHITELIST = { "admin", "enforcers/moderator", "ringleaders/officer" }
+
 
 class IronWorks(commands.Cog):
     def __init__(self, bot):
@@ -11,56 +15,117 @@ class IronWorks(commands.Cog):
 
     @commands.command(name='commission')
     async def commission(self, ctx, *args):
-        wish = ' '.join(args)
-
-        if not ctx.channel.id == 786758347818008626:
-            return
-
-        if len(wish) == 0:
-            empty_wish_embed = discord.Embed(title="Cid needs you to format your request properly!",
-                                             description="Please include what your request is with your command. i.e. "
-                                                         ";wish Titanbronze Star Globe")
-            empty_wish_embed.set_thumbnail(
-                url="https://cdn.discordapp.com/attachments/532380077896237061/786762838789849139/Cid_ARR.jpg")
-            await ctx.channel.send(embed=empty_wish_embed)
-            return
-
-        wish = ' '.join(args)
-        wish_embed = discord.Embed(title="{} has made a request!".format(ctx.message.author),
-                                   description='{}'.format(wish), color=0xff0209)
-        wish_embed.set_thumbnail(
-            url="https://cdn.discordapp.com/attachments/532380077896237061/786762838789849139/Cid_ARR.jpg")
-        wish_embed.add_field(name="Created by:", value="{}".format(ctx.message.author.mention), inline=True)
-        wish_embed.set_footer(
-            text="Someone involved in the Ironworks production team will be in contact with you soon.")
-        wish_embed.timestamp = datetime.utcnow()
-        await ctx.channel.send(embed=wish_embed)
+        commission = ' '.join(args)
+        if ctx.channel.id == IRONWORK_CHANNEL:
+            if len(commission) == 0:
+                new_embed = discord.Embed(title="Error",
+                                          description="*Please include a full description of your request.*\n"
+                                                      "***w^commission <commission>***",
+                                          color=0xff0209)
+            else:
+                if ctx.message.author.nick:
+                    comm_author = str(ctx.message.author.nick)
+                else:
+                    comm_author = str(ctx.message.author)[:-5]
+                new_embed = discord.Embed(title="__***{}***__ *has made a new commission!*".format(comm_author),
+                                          description="{}".format(commission),
+                                          color=0xff0209)
+                new_embed.set_thumbnail(
+                    url="https://cdn.discordapp.com/attachments/532380077896237061/786762838789849139/Cid_ARR.jpg")
+                new_embed.add_field(name="**Accepted by:**",
+                                    value="N/A",
+                                    inline=True)
+                new_embed.set_footer(text="Created by: {}".format(ctx.message.author))
+                new_embed.timestamp = datetime.utcnow()
+            await ctx.channel.send(embed=new_embed)
 
     @commands.Cog.listener()
     async def on_message(self, message):
         user = await self.bot.fetch_user(message.author.id)
-        if message.channel.id == 786758347818008626 and not user.bot:
-            await discord.Message.delete(message)
-        if message.channel.id == 786758347818008626 and user.bot:
-            emoji = '\U0000274c'
-            await discord.Message.add_reaction(message, emoji)
+        if message.channel.id == IRONWORK_CHANNEL:
+            if user.bot and user.id == IRONWORK_BOT_ID:
+                try:
+                    if str(message.embeds[0].title) in ('Error'):
+                        await asyncio.sleep(3)
+                        await discord.Message.delete(message)
+                    else:
+                        reactions = ['\U00002705', '\U0000274E']
+                        for emoji in reactions:
+                            await discord.Message.add_reaction(message, emoji)
+                except Exception:
+                    pass
+            elif str(message.content[:12]) == 'w^commission':
+                await discord.Message.delete(message)
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
         user = await self.bot.fetch_user(payload.user_id)
         channel = await self.bot.fetch_channel(payload.channel_id)
         message = await channel.fetch_message(payload.message_id)
-        embed = None
-        if 786758347818008626 == message.channel.id:
-            reaction = payload.emoji
-            if message.embeds:
-                embed = message.embeds[0].title
-
-            if str(reaction) == '❌' and not user.bot:
-                await discord.Message.delete(message)
-            elif user.bot and str(embed) == 'Cid needs you to format your request properly!':
-                await asyncio.sleep(5)
-                await discord.Message.delete(message)
+        old_embed = message.embeds[0] or None
+        if old_embed.footer:
+            comm_owner = old_embed.footer.text[12:]
+        if channel.id == IRONWORK_CHANNEL and not user.bot:
+            if payload.emoji.name == '✅':
+                if not str(user) == comm_owner:
+                    for i, field in enumerate(old_embed.fields):
+                        new_embed = discord.Embed(title=old_embed.title,
+                                                  description=old_embed.description,
+                                                  color=old_embed.color,
+                                                  timestamp=old_embed.timestamp)
+                        new_embed.set_thumbnail(
+                            url="https://cdn.discordapp.com/attachments/532380077896237061/786762838789849139/Cid_ARR.jpg")
+                        new_embed.set_footer(text=old_embed.footer.text)
+                        for react in message.reactions:
+                            async for user in react.users():
+                                if react.emoji == '✅' and not user.bot:
+                                    if field.value == 'N/A':
+                                        field.value = str(user.mention)+'\n'
+                                    elif user.mention not in field.value:
+                                        field.value = field.value+'\n'+str(user.mention)
+                                    else:
+                                        new_embed = discord.Embed(title="Error",
+                                                                  description="*You already accepted this commission.*",
+                                                                  color=0xff0209)
+                                        await channel.send(embed=new_embed)
+                        new_embed.add_field(name=field.name,
+                                            value=field.value,
+                                            inline=True)
+                    await message.edit(embed=new_embed)
+                else:
+                    new_embed = discord.Embed(title="Error",
+                                              description="*You cannot accept your own commission.*",
+                                              color=0xff0209)
+                    await channel.send(embed=new_embed)
+            elif payload.emoji.name == '❎':
+                if str(user) == comm_owner:
+                    await discord.Message.delete(message)
+                else:
+                    for i, field in enumerate(old_embed.fields):
+                        new_embed = discord.Embed(title=old_embed.title,
+                                                  description=old_embed.description,
+                                                  color=old_embed.color,
+                                                  timestamp=old_embed.timestamp)
+                        field.value = field.value.replace(str(user.mention), '')
+                        try:
+                            field.value = field.value.replace('\n\n', '\n')
+                        finally:
+                            if field.value == '':
+                                field.value = 'N/A'
+                            new_embed.add_field(name=field.name,
+                                                value=field.value,
+                                                inline=True)
+                            new_embed.set_thumbnail(
+                                url="https://cdn.discordapp.com/attachments/532380077896237061/786762838789849139/Cid_ARR.jpg")
+                            new_embed.set_footer(text=old_embed.footer.text)
+                            await message.edit(embed=new_embed)
+        try:
+            for react in message.reactions:
+                async for user in react.users():
+                    if not user.bot:
+                        await react.remove(user)
+        finally:
+            return
 
 
 def setup(bot):
